@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"github.com/tarm/serial"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -23,31 +25,31 @@ func main() {
 
 	fmt.Println("\n\nGuelcome tu de debag for de MIPs\n")
 
-	flag.StringVar(&dev,"d", "ttyUSB1", "Dispositivo serial en el /dev/<dispositivo>")
-	flag.IntVar(&baud,"b", 115200, "Baud rate")
-	flag.StringVar(&fileProgram,"l", "", "Program file to be load")
+	flag.StringVar(&dev, "d", "ttyUSB1", "Dispositivo serial en el /dev/<dispositivo>")
+	flag.IntVar(&baud, "b", 115200, "Baud rate")
+	flag.StringVar(&fileProgram, "l", "", "Program file to be load")
 	flag.Parse()
 
-
-	if "" == fileProgram{
+	if "" == fileProgram {
 		fmt.Println("Negri cargame el programa, mentime con el archivo aunque sea")
 		//flag.Usage()
 		//return
-	}else {
+	} else {
 		info, err := os.Stat(fileProgram)
 		if os.IsNotExist(err) || info.IsDir() {
 			fmt.Println("El archivo %s no existe o es un directorio\n", fileProgram)
 		}
 	}
 
+	getPrompt()
 
 	serDev = connect(dev, baud)
 	defer serDev.Close()
 	serDev.Flush() // Descarto datos en buffer i/o sin enviarlos ni lerlos
 
-
-
 }
+
+//================================ Manejo del serial ==================================================================
 
 /**************************************************
 				CONEXION SERIAL
@@ -91,7 +93,28 @@ func reciveBytes(num int) []byte {
 
 }
 
-//=====================================================================================================================
+//================================== Comunicacion serial con el debugger ==============================================
+
+/**************************************************
+Just Do'it, ahr
+*/
+/**************************************************/
+func runStep() {
+	const doStepEnable byte = byte(11)
+	const doStepDisable byte = byte(12)
+	const dataToSend int = 6 // 4optimi
+
+	var sendArray []byte = make([]byte, 0, dataToSend)
+
+	sendArray = append(sendArray, doStepEnable, 0x00, 0x00)
+	sendArray = append(sendArray, doStepDisable, 0x00, 0x00)
+
+	sendBytes(sendArray, len(sendArray))
+	fmt.Printf(">> [duStep] || % x || %d \n", sendArray, sendArray)
+
+	return
+}
+
 /**************************************************
 				Write one instrucction
 ***************************************************/
@@ -101,8 +124,8 @@ func writeInstruction(addr int32, instruccion string) {
 	const writeInstructionAddrHigh byte = byte(16)
 	const writeInstructionDataLow byte = byte(17)
 	const writeInstructionDataHigh byte = byte(18)
-	const writeInstructionEnable  byte = byte(19)
-	const writeInstructionDisable  byte = byte(20)
+	const writeInstructionEnable byte = byte(19)
+	const writeInstructionDisable byte = byte(20)
 
 	const dataToSend int = 18 // 4optimi
 
@@ -127,7 +150,6 @@ func writeInstruction(addr int32, instruccion string) {
 	sendArray = append(sendArray, writeInstructionEnable, 0x00, 0x00)
 	sendArray = append(sendArray, writeInstructionDisable, 0x00, 0x00)
 
-
 	sendBytes(sendArray, len(sendArray))
 	fmt.Printf(">> [WrInst] || % x || %d \n", sendArray, sendArray)
 
@@ -141,18 +163,20 @@ func writeInstruction(addr int32, instruccion string) {
 ***************************************************/
 
 func dumRegFile() [32][]byte {
-	const dumpRegIndex byte = byte(21)
+	const dumpRegWriteIndex byte = byte(21)
+	const dumpRegRead byte = byte(24)
 	const dataToSend int = 6;
 	const dataToRecv int = 4;
-	var requestRead []byte = []byte{0xff,0xff,0xff}
+	var requestRead []byte = []byte{0xff, 0xff, 0xff}
 
 	var sendArray []byte = make([]byte, 0, dataToSend)
 	var registerFile [32][]byte
 
 	for i := 0; i < 32; i++ {
-		sendArray = append(sendArray, dumpRegIndex)
+		sendArray = append(sendArray, dumpRegWriteIndex)
 		sendArray = append(sendArray, 0x00)
 		sendArray = append(sendArray, byte(i))
+		sendArray = append(sendArray, dumpRegRead, 0x00, 0x00)
 		sendArray = append(sendArray, requestRead...)
 
 		sendBytes(sendArray, dataToSend)
@@ -174,7 +198,7 @@ func dumpMemData(start int, end int) [][]byte {
 	const writeAddrMemLow byte = byte(22)
 	const writeAddrMemHigh byte = byte(23)
 	const readMemData byte = byte(29)
-	var requestRead []byte = []byte{0xff,0xff,0xff}
+	var requestRead []byte = []byte{0xff, 0xff, 0xff}
 	const dataToSend int = 12
 	const dataToRecv int = 4
 
@@ -187,36 +211,34 @@ func dumpMemData(start int, end int) [][]byte {
 	var memData [][]byte = make([][]byte, 0, numRegs)
 	var addrByte []byte
 
-
-	for i := 0 ; i < numRegs ; i++{
-		addrByte = str32toByte(fmt.Sprintf("%032b", start + i))
+	for i := 0; i < numRegs; i++ {
+		addrByte = str32toByte(fmt.Sprintf("%032b", start+i))
 		sendArray = append(sendArray, writeAddrMemHigh)
 		sendArray = append(sendArray, addrByte[0:2]...)
 		sendArray = append(sendArray, writeAddrMemLow)
 		sendArray = append(sendArray, addrByte[2:4]...)
 		sendArray = append(sendArray, readMemData)
-		sendArray = append(sendArray, 0x00,0x00)
+		sendArray = append(sendArray, 0x00, 0x00)
 		sendArray = append(sendArray, requestRead...)
 
 		sendBytes(sendArray, dataToSend)
-		fmt.Printf(">> [Dump Mem %i] || % x || %d \n", start + i, sendArray, sendArray)
+		fmt.Printf(">> [Dump Mem %i] || % x || %d \n", start+i, sendArray, sendArray)
 
 		memData[i] = reciveBytes(dataToRecv)
-		fmt.Printf("<< [Dump Mem %i]  || % x || %d \n", start + i, memData[i], memData[i])
+		fmt.Printf("<< [Dump Mem %i]  || % x || %d \n", start+i, memData[i], memData[i])
 		sendArray = sendArray[:0] //Keep allocated memory
 	}
-
 
 	return memData
 }
 
-//=====================================================================================================================
-/*
+//===================================== utils 4  serial comunications =================================================
+/***************************************************
 			str32bits to [4]byte
 
 str:   "00000000  00000000  00000000  00000000"
        | byte[0] | byte[1] | byte[2] | byte[3]|
-*/
+***************************************************/
 func str32toByte(str string) []byte {
 
 	var result []byte = make([]byte, 4)
@@ -236,4 +258,43 @@ func str32toByte(str string) []byte {
 
 	return result;
 
+}
+
+//======================================= command line ================================================================
+func getPrompt() {
+	var reDumpReg *regexp.Regexp
+	var reStep *regexp.Regexp
+	var reExit *regexp.Regexp
+	var reDumpMem *regexp.Regexp
+
+	reader := bufio.NewReader(os.Stdin)
+
+	reExit = regexp.MustCompile(`(?m)exit$`)      // exit: sale del dumper
+	reDumpReg = regexp.MustCompile(`(?m)dumprf$`) // dumprf: dumpea los regfiles
+	reStep = regexp.MustCompile(`(?m)step$`)      // step: hace un step
+	reDumpMem = regexp.MustCompile(`(?m)dumpmem\s+([0-9]+)\s+([0-9]+)\s*$`) // dumpmem start end
+
+	for {
+		fmt.Print("#Debugger -> ")
+		text, _ := reader.ReadString('\n')
+		text = strings.Replace(text, "\n", "", -1)
+
+		if reExit.MatchString(text) {
+			return
+		} else if reDumpReg.MatchString(text) {
+			dumRegFile()
+		} else if reStep.MatchString(text) {
+			runStep()
+		} else if reDumpMem.MatchString(text) {
+			match := reDumpMem.FindStringSubmatch(text)
+			start, _ := strconv.Atoi(match[1])
+			end, _ := strconv.Atoi(match[2])
+			dumpMemData(start, end)
+		} else {
+			fmt.Println("Comando no reconocido")
+		}
+
+	}
+
+	return
 }
