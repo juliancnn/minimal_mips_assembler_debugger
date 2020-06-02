@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/tarm/serial"
+	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
@@ -13,8 +14,9 @@ import (
 )
 
 var serDev *serial.Port
+var verbose bool
+var asm string;
 
-// @TODO chequear todos los cmd enviados y orden de bytes
 func main() {
 
 	// Uart config
@@ -28,24 +30,27 @@ func main() {
 	flag.StringVar(&dev, "d", "ttyUSB1", "Dispositivo serial en el /dev/<dispositivo>")
 	flag.IntVar(&baud, "b", 115200, "Baud rate")
 	flag.StringVar(&fileProgram, "l", "", "Program file to be load")
+	flag.BoolVar(&verbose, "verbose mode", true, "Muestra lo enviado y lo recibido por la uart")
 	flag.Parse()
 
 	if "" == fileProgram {
 		fmt.Println("Negri cargame el programa, mentime con el archivo aunque sea")
-		//flag.Usage()
-		//return
+		flag.Usage()
+		return
 	} else {
 		info, err := os.Stat(fileProgram)
 		if os.IsNotExist(err) || info.IsDir() {
 			fmt.Println("El archivo %s no existe o es un directorio\n", fileProgram)
 		}
+		asm = loadASM(fileProgram);
 	}
 
-	getPrompt()
 
 	serDev = connect(dev, baud)
 	defer serDev.Close()
 	serDev.Flush() // Descarto datos en buffer i/o sin enviarlos ni lerlos
+
+	getPrompt()
 
 }
 
@@ -96,9 +101,8 @@ func reciveBytes(num int) []byte {
 //================================== Comunicacion serial con el debugger ==============================================
 
 /**************************************************
-Just Do'it, ahr
-*/
-/**************************************************/
+				Just Do'it, ahr
+***************************************************/
 func runStep() {
 	const doStepEnable byte = byte(11)
 	const doStepDisable byte = byte(12)
@@ -110,11 +114,32 @@ func runStep() {
 	sendArray = append(sendArray, doStepDisable, 0x00, 0x00)
 
 	sendBytes(sendArray, len(sendArray))
-	fmt.Printf(">> [duStep] || % x || %d \n", sendArray, sendArray)
+	if verbose{
+		fmt.Printf(">> [duStep] || % x || %d \n", sendArray, sendArray)
+	}
 
 	return
 }
+/**************************************************
+				Just Doit
+***************************************************/
+func runRun() {
+	const doRunEnable byte = byte(13)
+	const doRunDisable byte = byte(14)
+	const dataToSend int = 6 // 4optimi
 
+	var sendArray []byte = make([]byte, 0, dataToSend)
+
+	sendArray = append(sendArray, doRunEnable, 0x00, 0x00)
+	sendArray = append(sendArray, doRunDisable, 0x00, 0x00)
+
+	sendBytes(sendArray, len(sendArray))
+	if verbose{
+		fmt.Printf(">> [duStep] || % x || %d \n", sendArray, sendArray)
+	}
+
+	return
+}
 /**************************************************
 				Write one instrucction
 ***************************************************/
@@ -151,15 +176,16 @@ func writeInstruction(addr int32, instruccion string) {
 	sendArray = append(sendArray, writeInstructionDisable, 0x00, 0x00)
 
 	sendBytes(sendArray, len(sendArray))
-	fmt.Printf(">> [WrInst] || % x || %d \n", sendArray, sendArray)
+	if verbose{
+		fmt.Printf(">> [WrInst] || % x || %d \n", sendArray, sendArray)
+	}
+
 
 	return // Devolver el ack
 }
 
 /**************************************************
 				Dump of reg file
-@TODO falta del lado del debugUnit setear para leer el regfile esto no va a andar hasta entonnces
-
 ***************************************************/
 
 func dumRegFile() [32][]byte {
@@ -180,10 +206,15 @@ func dumRegFile() [32][]byte {
 		sendArray = append(sendArray, requestRead...)
 
 		sendBytes(sendArray, dataToSend)
-		fmt.Printf(">> [Dump R%i] || % x || %d \n", i, sendArray, sendArray)
+		if verbose{
+			fmt.Printf(">> [Dump R%i] || % x || %d \n", i, sendArray, sendArray)
+		}
+
 
 		registerFile[i] = reciveBytes(dataToRecv)
-		fmt.Printf("<< [Dump R%i]  || % x || %d \n", i, registerFile[i], registerFile[i])
+		if verbose{
+			fmt.Printf("<< [Dump R%i]  || % x || %d \n", i, registerFile[i], registerFile[i])
+		}
 		sendArray = sendArray[:0] //Keep allocated memory
 	}
 
@@ -222,17 +253,21 @@ func dumpMemData(start int, end int) [][]byte {
 		sendArray = append(sendArray, requestRead...)
 
 		sendBytes(sendArray, dataToSend)
-		fmt.Printf(">> [Dump Mem %i] || % x || %d \n", start+i, sendArray, sendArray)
+		if verbose {
+			fmt.Printf(">> [Dump Mem %i] || % x || %d \n", start+i, sendArray, sendArray)
+		}
 
 		memData[i] = reciveBytes(dataToRecv)
-		fmt.Printf("<< [Dump Mem %i]  || % x || %d \n", start+i, memData[i], memData[i])
+		if verbose {
+			fmt.Printf("<< [Dump Mem %i]  || % x || %d \n", start+i, memData[i], memData[i])
+		}
 		sendArray = sendArray[:0] //Keep allocated memory
 	}
 
 	return memData
 }
 
-//===================================== utils 4  serial comunications =================================================
+//===================================== utils =========================================================================
 /***************************************************
 			str32bits to [4]byte
 
@@ -260,19 +295,45 @@ func str32toByte(str string) []byte {
 
 }
 
+func loadASM(filename string) string {
+	var contentFile string
+
+	var rawFile []byte
+	var err error
+	rawFile, err = ioutil.ReadFile(filename)
+	if err != nil {
+		log.Fatal(err)
+	}
+	contentFile = string(rawFile)
+
+	return contentFile
+}
+
+func writeProgram() {
+	lines := strings.Split(asm, "\n")
+
+	for i, v := range lines{
+		writeInstruction(int32(i),v)
+	}
+}
+
 //======================================= command line ================================================================
 func getPrompt() {
 	var reDumpReg *regexp.Regexp
 	var reStep *regexp.Regexp
+	var reRun *regexp.Regexp
 	var reExit *regexp.Regexp
 	var reDumpMem *regexp.Regexp
+	var reLoadRom *regexp.Regexp
 
 	reader := bufio.NewReader(os.Stdin)
 
 	reExit = regexp.MustCompile(`(?m)exit$`)      // exit: sale del dumper
 	reDumpReg = regexp.MustCompile(`(?m)dumprf$`) // dumprf: dumpea los regfiles
 	reStep = regexp.MustCompile(`(?m)step$`)      // step: hace un step
+	reRun = regexp.MustCompile(`(?m)run$`)      // run: hace un run run
 	reDumpMem = regexp.MustCompile(`(?m)dumpmem\s+([0-9]+)\s+([0-9]+)\s*$`) // dumpmem start end
+	reLoadRom = regexp.MustCompile(`(?m)load\s*$`) // dumpmem start end
 
 	for {
 		fmt.Print("#Debugger -> ")
@@ -282,14 +343,24 @@ func getPrompt() {
 		if reExit.MatchString(text) {
 			return
 		} else if reDumpReg.MatchString(text) {
-			dumRegFile()
+			dump := dumRegFile()
+			for i,v := range dump{
+				fmt.Printf( " | R%02d %s \n", i, prettyReg(v) )
+			}
 		} else if reStep.MatchString(text) {
 			runStep()
+		} else if reRun.MatchString(text) {
+			runRun()
+		} else if reLoadRom.MatchString(text) {
+			writeProgram()
 		} else if reDumpMem.MatchString(text) {
 			match := reDumpMem.FindStringSubmatch(text)
 			start, _ := strconv.Atoi(match[1])
 			end, _ := strconv.Atoi(match[2])
-			dumpMemData(start, end)
+			dump := dumpMemData(start, end)
+			for i,v := range dump{
+				fmt.Printf( " | Mem[%03d] %s \n", i, prettyReg(v) )
+			}
 		} else {
 			fmt.Println("Comando no reconocido")
 		}
@@ -297,4 +368,16 @@ func getPrompt() {
 	}
 
 	return
+}
+
+func prettyReg(dump [] byte) string {
+	var num uint32;
+
+	if len(dump) !=4 {
+		log.Fatal("Solo para 4 bytes\n");
+	}
+
+	num = uint32(dump[3]) << 24 | uint32(dump[2]) << 16 | uint32(dump[1]) << 8 | uint32(dump[0])
+
+	return fmt.Sprintf("| % x |  %2d  | %6d |", dump, dump, num)
 }
