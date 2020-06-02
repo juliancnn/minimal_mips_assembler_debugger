@@ -175,6 +175,27 @@ func runRun() {
 
 	return
 }
+
+/**************************************************
+				Just Doit
+***************************************************/
+func resetMips() {
+	const doResetEnable byte = byte(31)
+	const doResetDisable byte = byte(32)
+	const dataToSend int = 6 // 4optimi
+
+	var sendArray []byte = make([]byte, 0, dataToSend)
+
+	sendArray = append(sendArray, doResetEnable, 0x00, 0x00)
+	sendArray = append(sendArray, doResetDisable, 0x00, 0x00)
+
+	sendBytes(sendArray, len(sendArray))
+	if verbose{
+		fmt.Printf(">> [Reset] || % x || %d \n", sendArray, sendArray)
+	}
+
+	return
+}
 /**************************************************
 				Write one instrucction
 ***************************************************/
@@ -361,16 +382,18 @@ func getPrompt() {
 	var reDumpMem *regexp.Regexp
 	var reLoadRom *regexp.Regexp
 	var rePC *regexp.Regexp
+	var reReset *regexp.Regexp
 
 	reader := bufio.NewReader(os.Stdin)
 
-	reExit = regexp.MustCompile(`(?m)exit$`)      // exit: sale del dumper
-	reDumpReg = regexp.MustCompile(`(?m)dumprf$`) // dumprf: dumpea los regfiles
-	reStep = regexp.MustCompile(`(?m)step$`)      // step: hace un step
-	reRun = regexp.MustCompile(`(?m)run$`)      // run: hace un run run
-	rePC = regexp.MustCompile(`(?m)pc$`)      // pc: hace un run run
+	reExit = regexp.MustCompile(`(?m)exit$`)     		 // exit: sale del dumper
+	reDumpReg = regexp.MustCompile(`(?m)dumprf$`) 		// dumprf: dumpea los regfiles
+	reStep = regexp.MustCompile(`(?m)step\s*([0-9]*)$`) // step: hace un step
+	reRun = regexp.MustCompile(`(?m)run$`)      		// run: hace un run run
+	rePC = regexp.MustCompile(`(?m)pc$`)      			// pc: hace un run run
+	reReset = regexp.MustCompile(`(?m)reset$`)      	// pc: hace un run run
 	reDumpMem = regexp.MustCompile(`(?m)dumpmem\s+([0-9]+)\s+([0-9]+)\s*$`) // dumpmem start end
-	reLoadRom = regexp.MustCompile(`(?m)load\s*$`) // dumpmem start end
+	reLoadRom = regexp.MustCompile(`(?m)load\s*$`) 		// dumpmem start end
 
 	for {
 		fmt.Print("#Debugger -> ")
@@ -385,9 +408,23 @@ func getPrompt() {
 				fmt.Printf( " | R%02d %s \n", i, prettyReg(v) )
 			}
 		} else if reStep.MatchString(text) {
-			runStep()
+			match := reStep.FindStringSubmatch(text)
+			if len(match) == 2{
+				num, err := strconv.Atoi(match[1])
+				if err != nil{
+					runStep()
+				}else{
+					for i := 0; i < num ; i++{
+						runStep()
+					}
+				}
+			}else{
+				runStep()
+			}
 		} else if reRun.MatchString(text) {
 			runRun()
+		} else if reReset.MatchString(text) {
+			resetMips()
 		} else if rePC.MatchString(text) {
 			fmt.Printf( " | PC: %4d \n", getPC() )
 		} else if reLoadRom.MatchString(text) {
@@ -398,7 +435,7 @@ func getPrompt() {
 			end, _ := strconv.Atoi(match[2])
 			dump := dumpMemData(start, end)
 			for i,v := range dump{
-				fmt.Printf( " | Mem[%03d-%03d] %s \n", (i+start)*4, (i+start)*4+3, prettyReg(v) )
+				fmt.Printf( " | Mem[%03d-%03d] %03 %s \n", (i+start)*4, (i+start)*4+3, i,  prettyReg(v) )
 			}
 		} else {
 			fmt.Println("Comando no reconocido")
