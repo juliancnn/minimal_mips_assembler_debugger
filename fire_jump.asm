@@ -99,4 +99,4 @@ fiboFunc:
         ADDI R0, R2, 0 // <<-- GUARDO EN R5 EL RESULTADO DE FIBONACCI (PARA EN LA SIM SABER CUANDO CORTA)
         LUI  R1, 0
         SW   R0, 0(R1) // <<-- GUARDO en la posicion cero de la memoria el fibo result
-
+        halt

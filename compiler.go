@@ -21,19 +21,30 @@ import (
 func main() {
 
 	var asmContent string
+	var inputCode *string
 	var fileInputName *string
 	var fileOutputName *string
 	var fdOutput *os.File
 	var binaryCode []string;
 
 	//Check the flags
-	fileInputName = flag.String("i", "fire_jump.asm", "Input file to assemble")
+	fileInputName = flag.String("i", "", "Input file to assemble")
 	fileOutputName = flag.String("o", "", "text binary Output file")
+	inputCode = flag.String("a", "", "ASM one line, [dont use with -i]")
 	flag.Parse()
 
+	// Input ASM
+	if "" != *fileInputName{
+		asmContent = loadASM(*fileInputName)
+	}else if "" != *inputCode {
+		asmContent = *inputCode
+	}  else {
+		flag.Usage()
+		return
+	}
 
-	asmContent = loadASM(*fileInputName)
 
+	// Output ASM
 	if *fileOutputName != ""{
 		var err error
 		fdOutput, err = os.Create(*fileOutputName)
@@ -43,6 +54,7 @@ func main() {
 		}
 
 	}
+
 
 
 	rawAsm := clearCode(asmContent)   //stg 1
@@ -118,6 +130,10 @@ func clearCode(code string) []string {
 	// REMPLACE nop for sll r0, r0, 0
 	reComments = regexp.MustCompile(`(?mi)^nop\s*`)
 	codeClean = reComments.ReplaceAllString(codeClean, "sll r0, r0, 0\n")
+	/* ------------------ BUILT IN SIM  START  ------------------  */
+	// Generate halt
+	reComments = regexp.MustCompile(`(?mi)^halt\s*`)
+	codeClean = reComments.ReplaceAllString(codeClean, "halt 0\n")
 	/*  ------------------ BUILT IN SIM  END  ------------------  */
 	// Delete spaces after end int.
 	reComments = regexp.MustCompile(`(?m)\s*$`)
@@ -448,6 +464,8 @@ func generateLine(token []string) string {
 			inst_bin = setRS(inst_bin, token[1])
 			inst_bin = setRD(inst_bin, "31")
 		}
+	case "HALT":
+		inst_bin = "11111111111111111111111111111111"
 	default:
 		log.Fatalf("Instruccion no reconocida %q", token)
 
