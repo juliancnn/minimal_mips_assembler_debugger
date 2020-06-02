@@ -289,7 +289,7 @@ func dumpMemData(start int, end int) [][]byte {
 
 		sendBytes(sendArray, dataToSend)
 		if verbose {
-			fmt.Printf(">> [Dump Mem %d] || % x || %d \n", start+i, sendArray, sendArray)
+			fmt.Printf(">> [Dump Mem %d] || % x || %d \n", (start+i), sendArray, sendArray)
 		}
 
 		memData = append(memData, reciveBytes(dataToRecv))
@@ -398,7 +398,7 @@ func getPrompt() {
 			end, _ := strconv.Atoi(match[2])
 			dump := dumpMemData(start, end)
 			for i,v := range dump{
-				fmt.Printf( " | Mem[%03d] %s \n", i+start, prettyReg(v) )
+				fmt.Printf( " | Mem[%03d-%03d] %s \n", (i+start)*4, (i+start)*4+3, prettyReg(v) )
 			}
 		} else {
 			fmt.Println("Comando no reconocido")
