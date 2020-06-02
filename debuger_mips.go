@@ -101,6 +101,41 @@ func reciveBytes(num int) []byte {
 //================================== Comunicacion serial con el debugger ==============================================
 
 /**************************************************
+				Dump of reg file
+***************************************************/
+
+func getPC() uint32 {
+	const dumpPCread byte = byte(30)
+	const dataToSend int = 6;
+	const dataToRecv int = 4;
+
+	var pc uint32;
+	var requestPC []byte = []byte{dumpPCread, 0x00, 0x00}
+	var requestRead []byte = []byte{0xff, 0xff, 0xff}
+
+	var sendArray []byte = make([]byte, 0, dataToSend)
+
+	sendArray = append(sendArray,requestPC...)
+	sendArray = append(sendArray,requestRead...)
+
+	var registerFile []byte
+
+	sendBytes(sendArray, dataToSend)
+	if verbose{
+		fmt.Printf(">> [Dump PC] || % x || %d \n", sendArray, sendArray)
+	}
+
+	registerFile = reciveBytes(dataToRecv)
+	if verbose{
+		fmt.Printf("<< [RES PC]  || % x || %d \n", registerFile, registerFile)
+	}
+
+	pc = uint32(registerFile[3]) << 24 | uint32(registerFile[2]) << 16 | uint32(registerFile[1]) << 8 | uint32(registerFile[0])
+
+	return pc
+}
+
+/**************************************************
 				Just Do'it, ahr
 ***************************************************/
 func runStep() {
@@ -207,13 +242,13 @@ func dumRegFile() [32][]byte {
 
 		sendBytes(sendArray, dataToSend)
 		if verbose{
-			fmt.Printf(">> [Dump R%i] || % x || %d \n", i, sendArray, sendArray)
+			fmt.Printf(">> [Dump R%d] || % x || %d \n", i, sendArray, sendArray)
 		}
 
 
 		registerFile[i] = reciveBytes(dataToRecv)
 		if verbose{
-			fmt.Printf("<< [Dump R%i]  || % x || %d \n", i, registerFile[i], registerFile[i])
+			fmt.Printf("<< [Dump R%d]  || % x || %d \n", i, registerFile[i], registerFile[i])
 		}
 		sendArray = sendArray[:0] //Keep allocated memory
 	}
@@ -312,7 +347,7 @@ func loadASM(filename string) string {
 func writeProgram() {
 	lines := strings.Split(asm, "\n")
 
-	for i, v := range lines{
+	for i, v := range lines[:len(lines)-1]{
 		writeInstruction(int32(i),v)
 	}
 }
@@ -325,6 +360,7 @@ func getPrompt() {
 	var reExit *regexp.Regexp
 	var reDumpMem *regexp.Regexp
 	var reLoadRom *regexp.Regexp
+	var rePC *regexp.Regexp
 
 	reader := bufio.NewReader(os.Stdin)
 
@@ -332,6 +368,7 @@ func getPrompt() {
 	reDumpReg = regexp.MustCompile(`(?m)dumprf$`) // dumprf: dumpea los regfiles
 	reStep = regexp.MustCompile(`(?m)step$`)      // step: hace un step
 	reRun = regexp.MustCompile(`(?m)run$`)      // run: hace un run run
+	rePC = regexp.MustCompile(`(?m)pc$`)      // pc: hace un run run
 	reDumpMem = regexp.MustCompile(`(?m)dumpmem\s+([0-9]+)\s+([0-9]+)\s*$`) // dumpmem start end
 	reLoadRom = regexp.MustCompile(`(?m)load\s*$`) // dumpmem start end
 
@@ -351,6 +388,8 @@ func getPrompt() {
 			runStep()
 		} else if reRun.MatchString(text) {
 			runRun()
+		} else if rePC.MatchString(text) {
+			fmt.Printf( " | PC: %4d \n", getPC() )
 		} else if reLoadRom.MatchString(text) {
 			writeProgram()
 		} else if reDumpMem.MatchString(text) {
@@ -359,7 +398,7 @@ func getPrompt() {
 			end, _ := strconv.Atoi(match[2])
 			dump := dumpMemData(start, end)
 			for i,v := range dump{
-				fmt.Printf( " | Mem[%03d] %s \n", i, prettyReg(v) )
+				fmt.Printf( " | Mem[%03d] %s \n", i+start, prettyReg(v) )
 			}
 		} else {
 			fmt.Println("Comando no reconocido")
