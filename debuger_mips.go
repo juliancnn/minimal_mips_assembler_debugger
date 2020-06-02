@@ -30,7 +30,7 @@ func main() {
 	flag.StringVar(&dev, "d", "ttyUSB1", "Dispositivo serial en el /dev/<dispositivo>")
 	flag.IntVar(&baud, "b", 115200, "Baud rate")
 	flag.StringVar(&fileProgram, "l", "", "Program file to be load")
-	flag.BoolVar(&verbose, "verbose mode", true, "Muestra lo enviado y lo recibido por la uart")
+	flag.BoolVar(&verbose, "v", false, "Muestra lo enviado y lo recibido por la uart")
 	flag.Parse()
 
 	if "" == fileProgram {
@@ -254,12 +254,12 @@ func dumpMemData(start int, end int) [][]byte {
 
 		sendBytes(sendArray, dataToSend)
 		if verbose {
-			fmt.Printf(">> [Dump Mem %i] || % x || %d \n", start+i, sendArray, sendArray)
+			fmt.Printf(">> [Dump Mem %d] || % x || %d \n", start+i, sendArray, sendArray)
 		}
 
-		memData[i] = reciveBytes(dataToRecv)
+		memData = append(memData, reciveBytes(dataToRecv))
 		if verbose {
-			fmt.Printf("<< [Dump Mem %i]  || % x || %d \n", start+i, memData[i], memData[i])
+			fmt.Printf("<< [Dump Mem %d]  || % x || %d \n", start+i, memData[i], memData[i])
 		}
 		sendArray = sendArray[:0] //Keep allocated memory
 	}
@@ -345,7 +345,7 @@ func getPrompt() {
 		} else if reDumpReg.MatchString(text) {
 			dump := dumRegFile()
 			for i,v := range dump{
-				fmt.Printf( " | R%02i %s \n", i, prettyReg(v) )
+				fmt.Printf( " | R%02d %s \n", i, prettyReg(v) )
 			}
 		} else if reStep.MatchString(text) {
 			runStep()
@@ -379,5 +379,5 @@ func prettyReg(dump [] byte) string {
 
 	num = uint32(dump[3]) << 24 | uint32(dump[2]) << 16 | uint32(dump[1]) << 8 | uint32(dump[0])
 
-	return fmt.Sprintf("| % x |  %2d  | %6d |", dump, dump, num)
+	return fmt.Sprintf("| % x |  %3d  | %6d |", dump, dump, num)
 }
