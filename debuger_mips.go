@@ -191,7 +191,7 @@ func writeInstruction(addr int32, instruccion string) {
 func dumRegFile() [32][]byte {
 	const dumpRegWriteIndex byte = byte(21)
 	const dumpRegRead byte = byte(24)
-	const dataToSend int = 6;
+	const dataToSend int = 9;
 	const dataToRecv int = 4;
 	var requestRead []byte = []byte{0xff, 0xff, 0xff}
 
@@ -345,7 +345,7 @@ func getPrompt() {
 		} else if reDumpReg.MatchString(text) {
 			dump := dumRegFile()
 			for i,v := range dump{
-				fmt.Printf( " | R%02d %s \n", i, prettyReg(v) )
+				fmt.Printf( " | R%02i %s \n", i, prettyReg(v) )
 			}
 		} else if reStep.MatchString(text) {
 			runStep()
