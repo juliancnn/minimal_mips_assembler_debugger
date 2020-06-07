@@ -435,7 +435,7 @@ func getPrompt() {
 			end, _ := strconv.Atoi(match[2])
 			dump := dumpMemData(start, end)
 			for i,v := range dump{
-				fmt.Printf( " | Mem[%03d-%03d] %03 %s \n", (i+start)*4, (i+start)*4+3, i,  prettyReg(v) )
+				fmt.Printf( " | Mem[%03d-%03d] %03d %s \n", (i+start)*4, (i+start)*4+3, i,  prettyReg(v) )
 			}
 		} else {
 			fmt.Println("Comando no reconocido")

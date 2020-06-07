@@ -80,6 +80,7 @@ func main() {
 		binaryCode = append(binaryCode, generateLine(inst))
 		fmt.Printf("%s\n",binaryCode[i] )
 	}
+	fmt.Printf("11111111111111111111111111111111")
 	binaryCode = append(binaryCode, "11111111111111111111111111111111") // apend halt
 
 	if fdOutput != nil{
