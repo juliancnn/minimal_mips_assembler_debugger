@@ -15,13 +15,13 @@ import (
 
 var serDev *serial.Port
 var verbose bool
-var asm string;
+var asm string
 
 func main() {
 
 	// Uart config
-	var dev string;
-	var baud int;
+	var dev string
+	var baud int
 	// File input config
 	var fileProgram string
 
@@ -42,9 +42,8 @@ func main() {
 		if os.IsNotExist(err) || info.IsDir() {
 			fmt.Println("El archivo %s no existe o es un directorio\n", fileProgram)
 		}
-		asm = loadASM(fileProgram);
+		asm = loadASM(fileProgram)
 	}
-
 
 	serDev = connect(dev, baud)
 	defer serDev.Close()
@@ -68,7 +67,7 @@ func connect(file string, baud int) *serial.Port {
 	if err != nil {
 		log.Fatal("[Error en conexion] %v", err)
 	}
-	return s;
+	return s
 }
 
 func sendBytes(buffer []byte, num int) {
@@ -94,7 +93,7 @@ func reciveBytes(num int) []byte {
 		nRecv = nRecv + n
 	}
 
-	return buf;
+	return buf
 
 }
 
@@ -106,31 +105,31 @@ func reciveBytes(num int) []byte {
 
 func getPC() uint32 {
 	const dumpPCread byte = byte(30)
-	const dataToSend int = 6;
-	const dataToRecv int = 4;
+	const dataToSend int = 6
+	const dataToRecv int = 4
 
-	var pc uint32;
+	var pc uint32
 	var requestPC []byte = []byte{dumpPCread, 0x00, 0x00}
 	var requestRead []byte = []byte{0xff, 0xff, 0xff}
 
 	var sendArray []byte = make([]byte, 0, dataToSend)
 
-	sendArray = append(sendArray,requestPC...)
-	sendArray = append(sendArray,requestRead...)
+	sendArray = append(sendArray, requestPC...)
+	sendArray = append(sendArray, requestRead...)
 
 	var registerFile []byte
 
 	sendBytes(sendArray, dataToSend)
-	if verbose{
+	if verbose {
 		fmt.Printf(">> [Dump PC] || % x || %d \n", sendArray, sendArray)
 	}
 
 	registerFile = reciveBytes(dataToRecv)
-	if verbose{
+	if verbose {
 		fmt.Printf("<< [RES PC]  || % x || %d \n", registerFile, registerFile)
 	}
 
-	pc = uint32(registerFile[3]) << 24 | uint32(registerFile[2]) << 16 | uint32(registerFile[1]) << 8 | uint32(registerFile[0])
+	pc = uint32(registerFile[3])<<24 | uint32(registerFile[2])<<16 | uint32(registerFile[1])<<8 | uint32(registerFile[0])
 
 	return pc
 }
@@ -149,12 +148,13 @@ func runStep() {
 	sendArray = append(sendArray, doStepDisable, 0x00, 0x00)
 
 	sendBytes(sendArray, len(sendArray))
-	if verbose{
+	if verbose {
 		fmt.Printf(">> [duStep] || % x || %d \n", sendArray, sendArray)
 	}
 
 	return
 }
+
 /**************************************************
 				Just Doit
 ***************************************************/
@@ -169,7 +169,7 @@ func runRun() {
 	sendArray = append(sendArray, doRunDisable, 0x00, 0x00)
 
 	sendBytes(sendArray, len(sendArray))
-	if verbose{
+	if verbose {
 		fmt.Printf(">> [duStep] || % x || %d \n", sendArray, sendArray)
 	}
 
@@ -190,12 +190,13 @@ func resetMips() {
 	sendArray = append(sendArray, doResetDisable, 0x00, 0x00)
 
 	sendBytes(sendArray, len(sendArray))
-	if verbose{
+	if verbose {
 		fmt.Printf(">> [Reset] || % x || %d \n", sendArray, sendArray)
 	}
 
 	return
 }
+
 /**************************************************
 				Write one instrucction
 ***************************************************/
@@ -213,8 +214,7 @@ func writeInstruction(addr int32, instruccion string) {
 	var sendArray []byte = make([]byte, 0, dataToSend)
 
 	addrByte := str32toByte(fmt.Sprintf("%032b", addr))
-	instByte := str32toByte(instruccion);
-
+	instByte := str32toByte(instruccion)
 
 	sendArray = append(sendArray, writeInstructionAddrHigh)
 	sendArray = append(sendArray, addrByte[0:2]...)
@@ -232,10 +232,9 @@ func writeInstruction(addr int32, instruccion string) {
 	sendArray = append(sendArray, writeInstructionDisable, 0x00, 0x00)
 
 	sendBytes(sendArray, len(sendArray))
-	if verbose{
+	if verbose {
 		fmt.Printf(">> [WrInst] || % x || %d \n", sendArray, sendArray)
 	}
-
 
 	return // Devolver el ack
 }
@@ -247,8 +246,8 @@ func writeInstruction(addr int32, instruccion string) {
 func dumRegFile() [32][]byte {
 	const dumpRegWriteIndex byte = byte(21)
 	const dumpRegRead byte = byte(24)
-	const dataToSend int = 9;
-	const dataToRecv int = 4;
+	const dataToSend int = 9
+	const dataToRecv int = 4
 	var requestRead []byte = []byte{0xff, 0xff, 0xff}
 
 	var sendArray []byte = make([]byte, 0, dataToSend)
@@ -262,13 +261,12 @@ func dumRegFile() [32][]byte {
 		sendArray = append(sendArray, requestRead...)
 
 		sendBytes(sendArray, dataToSend)
-		if verbose{
+		if verbose {
 			fmt.Printf(">> [Dump R%d] || % x || %d \n", i, sendArray, sendArray)
 		}
 
-
 		registerFile[i] = reciveBytes(dataToRecv)
-		if verbose{
+		if verbose {
 			fmt.Printf("<< [Dump R%d]  || % x || %d \n", i, registerFile[i], registerFile[i])
 		}
 		sendArray = sendArray[:0] //Keep allocated memory
@@ -310,7 +308,7 @@ func dumpMemData(start int, end int) [][]byte {
 
 		sendBytes(sendArray, dataToSend)
 		if verbose {
-			fmt.Printf(">> [Dump Mem %d] || % x || %d \n", (start+i), sendArray, sendArray)
+			fmt.Printf(">> [Dump Mem %d] || % x || %d \n", (start + i), sendArray, sendArray)
 		}
 
 		memData = append(memData, reciveBytes(dataToRecv))
@@ -347,7 +345,7 @@ func str32toByte(str string) []byte {
 	i, _ = strconv.ParseUint(str[24:32], 2, 8)
 	result[3] = byte(i)
 
-	return result;
+	return result
 
 }
 
@@ -368,8 +366,8 @@ func loadASM(filename string) string {
 func writeProgram() {
 	lines := strings.Split(asm, "\n")
 
-	for i, v := range lines[:len(lines)-1]{
-		writeInstruction(int32(i),v)
+	for i, v := range lines[:len(lines)-1] {
+		writeInstruction(int32(i), v)
 	}
 }
 
@@ -386,14 +384,14 @@ func getPrompt() {
 
 	reader := bufio.NewReader(os.Stdin)
 
-	reExit = regexp.MustCompile(`(?m)exit$`)     		 // exit: sale del dumper
-	reDumpReg = regexp.MustCompile(`(?m)dumprf$`) 		// dumprf: dumpea los regfiles
-	reStep = regexp.MustCompile(`(?m)step\s*([0-9]*)$`) // step: hace un step
-	reRun = regexp.MustCompile(`(?m)run$`)      		// run: hace un run run
-	rePC = regexp.MustCompile(`(?m)pc$`)      			// pc: hace un run run
-	reReset = regexp.MustCompile(`(?m)reset$`)      	// pc: hace un run run
+	reExit = regexp.MustCompile(`(?m)exit$`)                                // exit: sale del dumper
+	reDumpReg = regexp.MustCompile(`(?m)dumprf$`)                           // dumprf: dumpea los regfiles
+	reStep = regexp.MustCompile(`(?m)step\s*([0-9]*)$`)                     // step: hace un step
+	reRun = regexp.MustCompile(`(?m)run$`)                                  // run: hace un run run
+	rePC = regexp.MustCompile(`(?m)pc$`)                                    // pc: hace un run run
+	reReset = regexp.MustCompile(`(?m)reset$`)                              // pc: hace un run run
 	reDumpMem = regexp.MustCompile(`(?m)dumpmem\s+([0-9]+)\s+([0-9]+)\s*$`) // dumpmem start end
-	reLoadRom = regexp.MustCompile(`(?m)load\s*$`) 		// dumpmem start end
+	reLoadRom = regexp.MustCompile(`(?m)load\s*$`)                          // dumpmem start end
 
 	for {
 		fmt.Print("#Debugger -> ")
@@ -404,21 +402,21 @@ func getPrompt() {
 			return
 		} else if reDumpReg.MatchString(text) {
 			dump := dumRegFile()
-			for i,v := range dump{
-				fmt.Printf( " | R%02d %s \n", i, prettyReg(v) )
+			for i, v := range dump {
+				fmt.Printf(" | R%02d %s \n", i, prettyReg(v))
 			}
 		} else if reStep.MatchString(text) {
 			match := reStep.FindStringSubmatch(text)
-			if len(match) == 2{
+			if len(match) == 2 {
 				num, err := strconv.Atoi(match[1])
-				if err != nil{
+				if err != nil {
 					runStep()
-				}else{
-					for i := 0; i < num ; i++{
+				} else {
+					for i := 0; i < num; i++ {
 						runStep()
 					}
 				}
-			}else{
+			} else {
 				runStep()
 			}
 		} else if reRun.MatchString(text) {
@@ -426,7 +424,7 @@ func getPrompt() {
 		} else if reReset.MatchString(text) {
 			resetMips()
 		} else if rePC.MatchString(text) {
-			fmt.Printf( " | PC: %4d \n", getPC() )
+			fmt.Printf(" | PC: %4d \n", getPC())
 		} else if reLoadRom.MatchString(text) {
 			writeProgram()
 		} else if reDumpMem.MatchString(text) {
@@ -434,8 +432,8 @@ func getPrompt() {
 			start, _ := strconv.Atoi(match[1])
 			end, _ := strconv.Atoi(match[2])
 			dump := dumpMemData(start, end)
-			for i,v := range dump{
-				fmt.Printf( " | Mem[%03d-%03d] %03d %s \n", (i+start)*4, (i+start)*4+3, i,  prettyReg(v) )
+			for i, v := range dump {
+				fmt.Printf(" | Mem[%03d-%03d] %03d %s \n", (i+start)*4, (i+start)*4+3, i, prettyReg(v))
 			}
 		} else {
 			fmt.Println("Comando no reconocido")
@@ -446,14 +444,14 @@ func getPrompt() {
 	return
 }
 
-func prettyReg(dump [] byte) string {
-	var num uint32;
+func prettyReg(dump []byte) string {
+	var num uint32
 
-	if len(dump) !=4 {
-		log.Fatal("Solo para 4 bytes\n");
+	if len(dump) != 4 {
+		log.Fatal("Solo para 4 bytes\n")
 	}
 
-	num = uint32(dump[3]) << 24 | uint32(dump[2]) << 16 | uint32(dump[1]) << 8 | uint32(dump[0])
+	num = uint32(dump[3])<<24 | uint32(dump[2])<<16 | uint32(dump[1])<<8 | uint32(dump[0])
 
 	return fmt.Sprintf("| % x |  %3d  | %6d |", dump, dump, num)
 }

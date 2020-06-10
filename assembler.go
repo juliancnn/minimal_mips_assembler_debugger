@@ -11,13 +11,34 @@ import (
 	"strings"
 )
 
-// Sporta asm con instrucciones mayusculas o minusculas,
-// comentarios del tipo // y multilineas con /* */
-// Los registris pueden terner nosmbres como $R1 R1 $1 r01
-// Detecta etiquetas duplicadas en la declaracion.
-// detecta uso de etiquetas sin asignar.
-// Las instrucciones se separan por endlines, el ; es opcional
-
+/*
+ * 						SIMPLE ASSEMBLER
+ * 
+ * Simple assembler for micro_clone_mips
+ *
+ * usage: ./assembler -h 
+ * asm ex: fire_jump.asm
+ *
+ * Supports:
+ *      - Multiline comments (style / * * /)
+ *      - Inline comments (style //)
+ *      - Insensitive instructions
+ *      - Register names like $R1 R1 $1 r01
+ *      - Tags for jump and banch
+ *      - Duplicate tag detection
+ *      - Unused tags
+ *      - Instructions are separated by endlines, semicolon is optional
+ *      - Builtin auto halt at end 
+ *      - Builtin nop (sll 0 0 0)
+ *
+ * Instrucction set:
+ * 	SLL SRL SRA SLLV SRLV SRAV ADDU SUBU AND OR XOR
+ * 	NOR SLT LB LH LW LWU LHU LBU SB SH SW ADDI ANDI
+ * 	ORI XORI LUI SLTI BEQ BNE J JAL JR JALR
+ * 
+ * 
+ *
+ */
 func main() {
 
 	var asmContent string
@@ -25,7 +46,7 @@ func main() {
 	var fileInputName *string
 	var fileOutputName *string
 	var fdOutput *os.File
-	var binaryCode []string;
+	var binaryCode []string
 
 	//Check the flags
 	fileInputName = flag.String("i", "", "Input file to assemble")
@@ -34,18 +55,17 @@ func main() {
 	flag.Parse()
 
 	// Input ASM
-	if "" != *fileInputName{
+	if "" != *fileInputName {
 		asmContent = loadASM(*fileInputName)
-	}else if "" != *inputCode {
+	} else if "" != *inputCode {
 		asmContent = *inputCode
-	}  else {
+	} else {
 		flag.Usage()
 		return
 	}
 
-
 	// Output ASM
-	if *fileOutputName != ""{
+	if *fileOutputName != "" {
 		var err error
 		fdOutput, err = os.Create(*fileOutputName)
 		if err != nil {
@@ -54,8 +74,6 @@ func main() {
 		}
 
 	}
-
-
 
 	rawAsm := clearCode(asmContent)   //stg 1
 	asm, tags := removeLabels(rawAsm) // stg2
@@ -78,14 +96,14 @@ func main() {
 	fmt.Print("\n--------GENERACION DEL ASM ------\n")
 	for i, inst := range asmListTokens {
 		binaryCode = append(binaryCode, generateLine(inst))
-		fmt.Printf("%s\n",binaryCode[i] )
+		fmt.Printf("%s\n", binaryCode[i])
 	}
 	fmt.Printf("11111111111111111111111111111111")
-	binaryCode = append(binaryCode, "11111111111111111111111111111111") // apend halt
+	binaryCode = append(binaryCode, "11111111111111111111111111111111")
 
-	if fdOutput != nil{
-		for _,line := range binaryCode{
-			fmt.Fprintln(fdOutput,line)
+	if fdOutput != nil {
+		for _, line := range binaryCode {
+			fmt.Fprintln(fdOutput, line)
 		}
 	}
 
@@ -117,7 +135,6 @@ func clearCode(code string) []string {
 
 	var reComments *regexp.Regexp
 	var codeClean string
-
 
 	// Delete Inline comments //
 	reComments = regexp.MustCompile(`(?m)s*//.*$`)
@@ -232,7 +249,7 @@ func tokenicer(asm []string) [][]string {
 
 func resolveTags(asmTekenized [][]string, tags map[string]int) [][]string {
 	var branchRel = [...]string{"BNE", "BEQ"} // Constantes x ser array inmutalbe
-	var jumpAbs = [...]string{"JAL", "J"}   // Constantes x ser array inmutalbe
+	var jumpAbs = [...]string{"JAL", "J"}     // Constantes x ser array inmutalbe
 	const posOffset int = 3
 	const posTag int = 1
 
