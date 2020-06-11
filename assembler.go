@@ -13,10 +13,10 @@ import (
 
 /*
  * 						SIMPLE ASSEMBLER
- * 
+ *
  * Simple assembler for micro_clone_mips
  *
- * usage: ./assembler -h 
+ * usage: ./assembler -h
  * asm ex: fire_jump.asm
  *
  * Supports:
@@ -28,15 +28,15 @@ import (
  *      - Duplicate tag detection
  *      - Unused tags
  *      - Instructions are separated by endlines, semicolon is optional
- *      - Builtin auto halt at end 
+ *      - Builtin auto halt at end
  *      - Builtin nop (sll 0 0 0)
  *
  * Instrucction set:
  * 	SLL SRL SRA SLLV SRLV SRAV ADDU SUBU AND OR XOR
  * 	NOR SLT LB LH LW LWU LHU LBU SB SH SW ADDI ANDI
  * 	ORI XORI LUI SLTI BEQ BNE J JAL JR JALR
- * 
- * 
+ *
+ *
  *
  */
 func main() {
@@ -54,8 +54,15 @@ func main() {
 	inputCode = flag.String("a", "", "ASM one line, [dont use with -i]")
 	flag.Parse()
 
+	// Check flags convination
+
 	// Input ASM
 	if "" != *fileInputName {
+		if "" != *inputCode {
+			fmt.Print("\nDont use -i and -a at the same time\n")
+			flag.Usage()
+			return
+		}
 		asmContent = loadASM(*fileInputName)
 	} else if "" != *inputCode {
 		asmContent = *inputCode
@@ -98,8 +105,11 @@ func main() {
 		binaryCode = append(binaryCode, generateLine(inst))
 		fmt.Printf("%s\n", binaryCode[i])
 	}
-	fmt.Printf("11111111111111111111111111111111")
-	binaryCode = append(binaryCode, "11111111111111111111111111111111")
+
+	if *inputCode != "" {
+		fmt.Printf("11111111111111111111111111111111")
+		binaryCode = append(binaryCode, "11111111111111111111111111111111")
+	}
 
 	if fdOutput != nil {
 		for _, line := range binaryCode {
